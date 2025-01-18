@@ -1,7 +1,6 @@
 name: Build ipk for HomeProxy
 
 on:
-  workflow_dispatch:
   push:
     branches:
       - 'master'
@@ -13,7 +12,6 @@ on:
       - 'Makefile'
       - '.github/**'
       - '!.github/ISSUE_TEMPLATE/**'
-
   pull_request:
     branches:
       - 'master'
@@ -28,10 +26,10 @@ on:
       - 'Makefile'
       - '.github/**'
       - '!.github/ISSUE_TEMPLATE/**'
-
   release:
     types:
       - published
+  workflow_dispatch:
 
 jobs:
   build:
@@ -50,17 +48,31 @@ jobs:
           echo "ASSET_NAME=$(ls *.ipk)" >> $GITHUB_ENV
           popd
 
-      - name: Publishing to GitHub Artifacts
+      - name: Create GitHub Release
+        id: create_release
+        uses: softprops/action-gh-release@v2.1.0
+        if: github.event_name == 'release'
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body_path: ${{ github.workspace }}/info.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload ipk as release asset
+        uses: softprops/action-gh-release@v2.1.0
+        if: github.event_name == 'release'
+        with:
+          tag_name: ${{ github.ref_name }}
+          files: .github/${{ env.ASSET_NAME }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload artifact for non-release events
         uses: actions/upload-artifact@v4
         if: github.event_name != 'release'
         with:
           name: ${{ env.ASSET_NAME }}
           path: .github/${{ env.ASSET_NAME }}
-
-      - name: Publishing to GitHub Releases
-        uses: svenstaro/upload-release-action@v2
-        if: github.event_name == 'release'
-        with:
-          repo_token: ${{ github.token }}
-          file: .github/${{ env.ASSET_NAME }}
-          tag: ${{ github.ref }}
